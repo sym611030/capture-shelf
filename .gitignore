@@ -1,11 +1,7 @@
 node_modules/
 dist/
 dist-electron/
-outputs/release/
-outputs/*.json
-outputs/*.png
-outputs/*.lnk
-outputs/*.ps1
+outputs/
 work/
 release-assets/
 build/
