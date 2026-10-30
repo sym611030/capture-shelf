@@ -1,0 +1,56 @@
+/* The desktop surface has no panel chrome: a caption, one cord and its photos. */
+body { min-height: 80px; }
+.rope-app-shell { display: block; position: relative; width: 100vw; height: 100vh; min-height: 0; border: 0; background: transparent; overflow: hidden; }
+.rope-shelf { position: relative; width: calc(100% - 16px); height: 100%; min-height: 0; margin: 0 8px; border-radius: 0; background: transparent; overflow: hidden; }
+.rope-shelf.is-drop-active { background: transparent; }
+.rope-shelf.is-drop-active::after { content: none; }
+.realistic-rope { position: absolute; z-index: 2; top: 0; left: 0; width: 100%; height: 70px; pointer-events: none; }
+.rope-caption { position: absolute; z-index: 8; top: 0; right: 18px; left: 25px; height: 23px; display: flex; align-items: center; gap: 6px; }
+.rope-drag-handle { margin: 0; padding: 2px 7px; border-radius: 4px; color: #ede9df; background: rgba(35, 33, 29, .72); font-size: 10px; line-height: 16px; letter-spacing: .015em; cursor: move; -webkit-app-region: drag; }
+.rope-count { margin-left: auto; color: #f4eee1; background: rgba(35,33,29,.64); padding: 2px 5px; border-radius: 4px; font-size: 10px; line-height: 15px; font-variant-numeric: tabular-nums; }
+.rope-menu-button, .rope-back { display: grid; place-items: center; width: 24px; height: 21px; border-radius: 4px; color: #f4eee1; background: rgba(35,33,29,.64); cursor: pointer; -webkit-app-region: no-drag; }
+.rope-menu-button:hover, .rope-back:hover { background: rgba(35,33,29,.94); }
+.rope-end-handle { position: absolute; z-index: 6; left: 10px; top: 21px; width: 23px; height: 22px; -webkit-app-region: drag; }
+.rope-cards { position: absolute; z-index: 4; inset: 0; display: flex; align-items: flex-start; gap: 22px; min-height: 0; padding: 0 35px 18px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.rope-cards::-webkit-scrollbar { display: none; }
+.rope-card { position: relative; flex: 0 0 var(--thumb-size); width: var(--thumb-size); padding-top: calc(var(--hang-y, 43px) + 10px); transform: none; transition: none; filter: none; }
+.rope-card:hover, .rope-card.is-selected { z-index: 5; transform: none; filter: none; }
+.hanging-photo { padding: 4px 4px 0; border: 1px solid #e7e1d5; border-top-color: #fffaf1; border-radius: 2px; background: #f8f5ed; box-shadow: 0 3px 4px rgba(28,23,15,.24), 1px 7px 12px rgba(28,23,15,.14); transform: rotate(var(--tilt)); transform-origin: 50% 0; transition: transform 160ms ease, box-shadow 160ms ease; }
+.rope-card:hover .hanging-photo { transform: rotate(0deg); box-shadow: 0 5px 14px rgba(28,23,15,.3); }
+.rope-card.is-selected .hanging-photo { border-color: #a5c9b5; }
+.rope-card-surface { display: block; position: relative; width: 100%; height: calc((var(--thumb-size) - 10px) * .60); padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #e8e3d9; box-shadow: none; cursor: grab; }
+.rope-card-surface::after { content: none; }
+.rope-card-surface img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.rope-card-surface .thumb-hover { display: flex; align-items: center; justify-content: center; opacity: 0; background: rgba(25,28,24,.54); color: #fff9ec; font-size: 11px; pointer-events: none; }
+.rope-card-surface:hover .thumb-hover { opacity: 1; }
+.rope-card.is-selected .rope-card-surface:not(:hover) .thumb-hover { opacity: 0; }
+.rope-card-meta { height: 23px; display: flex; align-items: center; gap: 6px; padding: 0 2px; color: #8a8274; font-size: 9px; }
+.rope-card-meta time { color: #655e52; font-size: 10px; }
+.rope-card-meta span { font-size: 8px; }
+.rope-card-meta button { width: 19px; height: 19px; margin-left: auto; color: #807567; opacity: 0; }
+.rope-card:hover .rope-card-meta button, .rope-card:focus-within .rope-card-meta button { opacity: 1; }
+.rope-card-meta button:hover { color: #9c4e43; background: #eae0d2; }
+.clothespin { position: absolute; z-index: 7; top: calc(var(--hang-y, 43px) - 12px); left: 50%; width: 15px; height: 31px; transform: translateX(-50%) rotate(-3deg); border: 1px solid #987445; border-radius: 2px 2px 3px 3px; background: repeating-linear-gradient(92deg, transparent 0 2px, rgba(107,69,31,.11) 2px 2.5px, transparent 2.5px 4px), linear-gradient(90deg, #b88a52, #dfbc84 22%, #ebc88e 43%, #9e743f 49%, #d3ad70 59%, #c69b5f); box-shadow: 1px 2px 2px rgba(45,31,13,.38), inset 1px 0 rgba(255,239,198,.62), inset -1px 0 rgba(97,64,29,.35); pointer-events: none; }
+.clothespin::before { content: ''; position: absolute; left: 6px; top: 1px; width: 1px; height: 26px; background: rgba(100,67,28,.4); transform: none; }
+.clothespin::after { content: ''; position: absolute; left: 1px; top: 10px; width: 11px; height: 5px; border: 1px solid #6c6a60; border-radius: 2px; background: repeating-linear-gradient(0deg, #98988b 0 1px, #5f615a 1px 2px); box-shadow: 0 1px rgba(255,243,213,.75); }
+.clothespin span { display: none; }
+.rope-scroll { position: absolute; z-index: 9; top: 95px; width: 25px; height: 29px; display: grid; place-items: center; border-radius: 6px; color: #f5ecdd; background: rgba(36,32,25,.83); cursor: pointer; opacity: 0; transition: opacity 140ms; }
+.rope-scroll.left { left: 6px; } .rope-scroll.right { right: 6px; }
+.rope-shelf:hover .rope-scroll, .rope-scroll:focus-visible { opacity: 1; }
+.rope-drop-hint { position: absolute; z-index: 15; top: 25px; left: 50%; transform: translateX(-50%); padding: 6px 11px; border: 1px solid #8eae94; border-radius: 6px; background: #2b4133; color: #ecf2e5; font-size: 11px; pointer-events: none; }
+.rope-app-shell .context-menu { z-index: 30; }
+.context-menu { font-size: 12px; }
+.rope-menu { position: fixed; top: 26px; right: 23px; width: 226px; padding: 7px; background: #262824; border-color: #55594d; border-radius: 9px; }
+.rope-menu button { font-size: 12px; min-height: 34px; }
+.menu-count { margin-left: auto; color: #9b9f90; font-size: 10px; }
+.menu-separator { height: 1px; background: #44473e; margin: 5px 4px; }
+.menu-shortcut { margin: 7px 9px 5px; color: #9b9f90; font-size: 10px; }
+.context-menu button:disabled { color: #656a5f; cursor: default; }
+.show-settings .rope-caption { -webkit-app-region: drag; }
+.rope-app-shell .settings-view { position: absolute; z-index: 10; top: 62px; left: 14px; right: 14px; bottom: 12px; margin: 0; padding: 19px 24px; border-radius: 12px; background: rgba(30,32,29,.98); }
+.settings-heading { display: flex; align-items: center; }
+.settings-section h3 { color: #c5d3b5; }
+.capture-warning { position: fixed; top: 23px; left: 50%; z-index: 25; transform: translateX(-50%); padding: 5px 9px; border-radius: 5px; background: #5a4325; color: #ffe5b1; font-size: 10px; cursor: pointer; }
+.toast { top: 24px; bottom: auto; max-width: calc(100% - 30px); padding: 6px 10px; font-size: 11px; }
+.loading { height: 80px; background: transparent; display: flex; justify-content: center; }
+@media (prefers-reduced-motion: reduce) { .hanging-photo, .rope-scroll { transition: none; } }

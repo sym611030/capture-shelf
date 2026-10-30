@@ -1,0 +1,55 @@
+{
+  "name": "capture-shelf",
+  "version": "0.1.0",
+  "description": "Local cross-platform desktop screenshot shelf",
+  "main": "dist-electron/main.js",
+  "author": "sym611030",
+  "homepage": "https://github.com/sym611030/capture-shelf",
+  "repository": { "type": "git", "url": "https://github.com/sym611030/capture-shelf.git" },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "npm run build:electron && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "build": "npm run typecheck && vite build && tsc -p electron/tsconfig.json",
+    "start": "electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "test:e2e": "npm run build && node scripts/smoke.cjs",
+    "package:portable": "npm run build && electron-builder --win portable --publish never",
+    "package:win": "npm run build && electron-builder --win --publish never",
+    "package:mac": "npm run build && electron-builder --mac --publish never"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "lucide-react": "^0.577.0",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "electron": "45.1.0",
+    "playwright": "^1.58.2",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron-builder": "latest",
+    "typescript": "5.9.3",
+    "vite": "latest",
+    "vitest": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.captureshelf.app",
+    "productName": "Capture Shelf",
+    "files": ["dist/**/*", "dist-electron/**/*", "assets/**/*", "package.json", "LICENSE"],
+    "directories": { "output": "outputs/release" },
+    "asar": true,
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }], "icon": "assets/icon.ico", "signExecutable": false },
+    "nsis": { "artifactName": "Capture-Shelf-${version}-windows-${arch}-setup.${ext}", "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "shortcutName": "截图晾衣绳", "runAfterFinish": true, "deleteAppDataOnUninstall": false, "include": "assets/uninstall.nsh" },
+    "portable": { "artifactName": "Capture-Shelf-${version}-windows-${arch}-portable.${ext}" },
+    "mac": { "artifactName": "Capture-Shelf-${version}-macos-${arch}.${ext}", "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }], "category": "public.app-category.utilities", "icon": "assets/icon.png", "minimumSystemVersion": "13.0", "hardenedRuntime": true, "extendInfo": { "NSDesktopFolderUsageDescription": "读取新产生的系统截图并加入本地截图板。", "NSDocumentsFolderUsageDescription": "读取你选择的截图文件夹。" } }
+  }
+}
