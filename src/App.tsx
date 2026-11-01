@@ -4,6 +4,7 @@ import type { AppState, ScreenshotItem, View } from './types';
 import { SettingsPanel } from './SettingsPanel';
 import { Onboarding } from './Onboarding';
 import { RealisticRope, ropeHeightAt } from './RealisticRope';
+import { useWindowHitRegions } from './useWindowHitRegions';
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -21,6 +22,7 @@ export default function App() {
   const shelfRef = useRef<HTMLElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const items = state ? view === 'active' ? state.active : state.recycled : [];
+  useWindowHitRegions(state?.platform === 'win32');
   const run = useCallback(async (operation: () => Promise<unknown>, success?: string) => {
     try {
       const result = await operation();
@@ -69,6 +71,11 @@ export default function App() {
     return () => { observer.disconnect(); cancelAnimationFrame(frame); cards?.removeEventListener('scroll', schedule); cards?.removeEventListener('wheel', wheel); };
   }, [items.length, state?.settings.thumbnailSize, settingsOpen]);
   useEffect(() => {
+    const blur = () => { setMenu(null); setPanelMenuOpen(false); };
+    window.addEventListener('blur', blur);
+    return () => window.removeEventListener('blur', blur);
+  }, []);
+  useEffect(() => {
     const clear = () => setDropActive(false);
     const afterDrop = (event: MouseEvent) => { if (event.buttons === 0) clear(); };
     window.addEventListener('dragend', clear); window.addEventListener('drop', clear); window.addEventListener('mousemove', afterDrop);
@@ -101,13 +108,13 @@ export default function App() {
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false); }}
       onDrop={(event) => { event.preventDefault(); setDropActive(false); for (const file of Array.from(event.dataTransfer.files)) void run(() => window.captureShelf.ingestDroppedImage(file), '图片已挂到绳子上'); }}>
       <div className="rope-caption">
-        {view === 'recycled' && <button className="rope-back" aria-label="返回最近截图" title="返回最近截图" onClick={() => setView('active')}><ArrowLeft size={13} /></button>}
-        <p className="rope-drag-handle" title="拖动这行文字移动绳子">{hint}</p>
-        <span className="rope-count" title="截图数量">{items.length}{view === 'active' ? ` / ${state.settings.activeLimit}` : ' 张'}</span>
-        <button className="rope-menu-button" aria-label="更多选项" title="更多选项" aria-expanded={panelMenuOpen} onClick={(event) => { event.stopPropagation(); setPanelMenuOpen(!panelMenuOpen); setMenu(null); }}><MoreHorizontal size={19} /></button>
+        {view === 'recycled' && <button className="rope-back" data-hit-region aria-label="返回最近截图" title="返回最近截图" onClick={() => setView('active')}><ArrowLeft size={13} /></button>}
+        <p className="rope-drag-handle" data-hit-region title="拖动这行文字移动绳子">{hint}</p>
+        <span className="rope-count" data-hit-region title="截图数量">{items.length}{view === 'active' ? ` / ${state.settings.activeLimit}` : ' 张'}</span>
+        <button className="rope-menu-button" data-hit-region aria-label="更多选项" title="更多选项" aria-expanded={panelMenuOpen} onClick={(event) => { event.stopPropagation(); setPanelMenuOpen(!panelMenuOpen); setMenu(null); }}><MoreHorizontal size={19} /></button>
       </div>
       <RealisticRope width={ropeWidth} />
-      <div className="rope-end-handle" title="拖动绳结移动" />
+      <div className="rope-end-handle" data-hit-region title="拖动绳结移动" />
       {settingsOpen ? <SettingsPanel state={state} run={run} close={() => setSettingsOpen(false)} /> : <>
         {items.length > 0 && <div className="rope-cards" ref={cardsRef}>{items.map((item, index) => <article className={`rope-card ${selectedId === item.id ? 'is-selected' : ''}`} key={item.id} data-id={item.id} style={{ '--tilt': `${[-2.2, 1.5, -.8, 2, -1.5, .7][index % 6]}deg` } as CSSProperties}>
           <span className="clothespin" aria-hidden="true"><span /></span>

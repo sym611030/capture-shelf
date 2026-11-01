@@ -1,0 +1,95 @@
+// Explicit Windows desktop test: clicks only a synthetic window under an isolated shelf.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const { _electron } = require('playwright');
+if (process.platform !== 'win32' || !process.argv.includes('--live-pointer')) throw new Error('Run on Windows with --live-pointer.');
+const root = path.resolve(__dirname, '..');
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'capture-shelf-hits-'));
+let app, target;
+const checks = [];
+async function click(x, y) {
+  const point = await app.evaluate(({ screen }, point) => screen.dipToScreenPoint(point), { x: Math.round(x), y: Math.round(y) });
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+    Add-Type 'using System; using System.Runtime.InteropServices; public class ShelfHitMouse { [DllImport("user32.dll")] public static extern bool SetProcessDPIAware(); [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y); [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr e); }';
+    [ShelfHitMouse]::SetProcessDPIAware() | Out-Null;
+    [ShelfHitMouse]::SetCursorPos(${point.x},${point.y}) | Out-Null;
+    Start-Sleep -Milliseconds 80;
+    [ShelfHitMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero);
+    [ShelfHitMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero);
+  `], { windowsHide: true, timeout: 10000, stdio: 'pipe' });
+}
+(async () => {
+  const env = { ...process.env, CAPTURE_SHELF_TEST: '1', CAPTURE_SHELF_TEST_DATA: profile };
+  delete env.ELECTRON_RUN_AS_NODE;
+  app = await _electron.launch({ executablePath: process.env.CAPTURE_SHELF_ELECTRON || require('electron'), args: [root], env });
+  const page = await app.firstWindow();
+  await page.getByRole('button', { name: '开始使用' }).click();
+  await page.waitForFunction(() => innerHeight === 80);
+  const newWindow = app.waitForEvent('window');
+  await app.evaluate(async ({ app, BrowserWindow }) => {
+    const shelf = BrowserWindow.getAllWindows()[0];
+    const background = new BrowserWindow({ x: 80, y: 100, width: 1180, height: 640, frame: false, webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true } });
+    app.hitTestBackground = background;
+    await background.loadURL('data:text/html,' + encodeURIComponent('<!doctype html><style>body{margin:0;background:#e4ede7}button{width:100vw;height:100vh;border:0;background:transparent;font:24px sans-serif}</style><button id="behind">Synthetic background target</button><script>window.hits=0;behind.onclick=()=>{window.hits++;behind.textContent="Received "+window.hits;};</script>'));
+    shelf.setBounds({ x: 80, y: 100, width: 1180, height: 80 }); shelf.setAlwaysOnTop(true); shelf.show(); shelf.focus();
+  });
+  target = await newWindow;
+  await target.waitForFunction(() => window.hits === 0);
+  await page.waitForTimeout(180);
+  const bounds = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+  let b = await bounds();
+  await click(b.x + 500, b.y + 10);
+  await page.waitForTimeout(120);
+  assert.equal(await target.evaluate(() => window.hits), 1, 'transparent space above the rope must click the underlying app');
+  checks.push('empty-rope transparent tab area sends a physical click to the underlying window');
+  const sample = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 240; canvas.height = 150;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#90b29c'; ctx.fillRect(0, 0, 240, 150);
+    return canvas.toDataURL('image/png');
+  });
+  await app.evaluate(({ app }, data) => app.captureShelfTest.ingest(data), sample);
+  await page.waitForSelector('.rope-card-surface');
+  await page.waitForFunction(() => innerHeight > 80);
+  await page.waitForTimeout(100);
+  b = await bounds();
+  await click(b.x + 500, b.y + 110);
+  await page.waitForTimeout(100);
+  assert.equal(await target.evaluate(() => window.hits), 2, 'space beside a photo must remain transparent to input');
+  checks.push('transparent space beside hanging photos remains clickable below');
+  const photo = await page.locator('.rope-card-surface').boundingBox();
+  await click(b.x + photo.x + photo.width / 2, b.y + photo.y + photo.height / 2);
+  await page.locator('.rope-card.is-selected').waitFor();
+  assert.equal(await target.evaluate(() => window.hits), 2, 'visible photos must receive their own click');
+  checks.push('visible photo still receives a physical click');
+  const more = await page.getByRole('button', { name: '更多选项' }).boundingBox();
+  await click(b.x + more.x + more.width / 2, b.y + more.y + more.height / 2);
+  await page.getByRole('menu').waitFor();
+  await page.waitForFunction(() => innerHeight >= 600);
+  await page.waitForTimeout(120);
+  await click(b.x + 500, b.y + 400);
+  await page.waitForTimeout(150);
+  assert.equal(await target.evaluate(() => window.hits), 3, 'expanded menu must not claim the whole transparent window');
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'hidden' });
+  checks.push('expanded-menu blank space still passes through to the underlying app');
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(720, 215));
+  await page.waitForTimeout(200);
+  b = await bounds();
+  const resizedMore = await page.getByRole('button', { name: '更多选项' }).boundingBox();
+  await click(b.x + resizedMore.x + resizedMore.width / 2, b.y + resizedMore.y + resizedMore.height / 2);
+  await page.getByRole('menu').waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'hidden' });
+  checks.push('native hit regions follow a 720px window resize');
+  const report = { ok: true, runtime: 'Electron / Windows', checks, limitations: ['macOS does not expose Electron native window shaping; its input behavior is unchanged'] };
+  fs.writeFileSync(path.join(root, 'outputs', 'hit-region-regression.json'), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report, null, 2));
+})().catch(error => { console.error(error.stack || error); process.exitCode = 1; }).finally(async () => {
+  if (app) await app.close();
+  const resolved = fs.realpathSync(profile);
+  if (!resolved.toLowerCase().startsWith(path.resolve(os.tmpdir()).toLowerCase() + path.sep)) throw new Error('Unexpected cleanup path');
+  fs.rmSync(resolved, { recursive: true, force: true });
+});

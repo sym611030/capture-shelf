@@ -7,6 +7,7 @@ import { ScreenshotRepository } from './repository';
 import { CaptureService, type WatchDirectory } from './capture-service';
 import { DragService } from './drag-service';
 import { clampBounds, type Bounds } from './window-state';
+import { sanitizeHitRegions } from './hit-regions';
 import type { AppState, SettingsPatch, View } from './contracts';
 
 app.setName('Capture Shelf');
@@ -24,6 +25,8 @@ let quitting = false;
 let timer: NodeJS.Timeout;
 let saveBoundsTimer: NodeJS.Timeout;
 let interactiveRegions: Array<{ x: number; y: number; width: number; height: number }> = [];
+let shapedWindow = false;
+let shapeSignature = '';
 let compactBounds: Bounds | undefined;
 const warnings = new Set<string>();
 const assetPath = (name: string) => path.join(__dirname, '../assets', name);
@@ -101,6 +104,16 @@ function validateSender(event: IpcMainInvokeEvent) {
   const url = event.senderFrame?.url;
   if (event.sender !== win?.webContents || !url || !(url === rendererFile || (devUrl && new URL(url).origin === new URL(devUrl).origin))) throw new Error('拒绝未知窗口请求');
 }
+function updateWindowShape() {
+  if (!win || process.platform !== 'win32' || typeof win.setShape !== 'function') return;
+  const rects = sanitizeHitRegions(interactiveRegions, win.getBounds());
+  if (!rects.length) return;
+  const signature = JSON.stringify(rects);
+  if (shapeSignature === signature) return;
+  win.setShape(rects);
+  shapeSignature = signature;
+  shapedWindow = true;
+}
 function registerIpc() {
   const handle = (channel: string, action: (...args: any[]) => unknown) => ipcMain.handle(channel, async (event, ...args) => {
     validateSender(event);
@@ -144,13 +157,14 @@ function registerIpc() {
   ipcMain.on('set-interactive-regions', (event, regions: unknown) => {
     try {
       validateSender(event as unknown as IpcMainInvokeEvent);
-      if (!Array.isArray(regions) || regions.length > 256) return;
+      if (!Array.isArray(regions) || regions.length > 1024) return;
       interactiveRegions = regions.filter((region): region is { x: number; y: number; width: number; height: number } => {
         if (!region || typeof region !== 'object') return false;
         const candidate = region as Record<string, unknown>;
         return ['x', 'y', 'width', 'height'].every((key) => typeof candidate[key] === 'number' && Number.isFinite(candidate[key]))
           && Number(candidate.width) >= 0 && Number(candidate.height) >= 0;
       }).map((region) => ({ x: Math.max(0, region.x), y: Math.max(0, region.y), width: Math.min(2400, region.width), height: Math.min(1200, region.height) }));
+      updateWindowShape();
     } catch { /* ignore stale renderer messages */ }
   });
   handle('copy-image', async (id: string) => {
@@ -275,7 +289,7 @@ async function start() {
       state,
       dragFile: (id: string) => drag.prepareDragFile(id),
       addWatch: async (directory: string) => { repository.updateSettings({ watchedDirectories: [directory] }); await capture.restartDirectories(); return state(); },
-      pointerState: () => ({ ignored: false, regions: interactiveRegions, bounds: win?.getBounds() }),
+      pointerState: () => ({ ignored: false, shaped: shapedWindow, regions: interactiveRegions, bounds: win?.getBounds() }),
     };
   }
 }

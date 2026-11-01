@@ -1,6 +1,6 @@
 {
   "name": "capture-shelf",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local cross-platform desktop screenshot shelf",
   "main": "dist-electron/main.js",
   "author": "sym611030",
