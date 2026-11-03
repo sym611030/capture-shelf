@@ -53,6 +53,9 @@ export interface CaptureShelfAPI {
   setPanelExpanded(expanded: boolean, compactHeight?: number): void;
   copyImage(id: string): Promise<void>;
   openImage(id: string): Promise<void>;
+  showImageInFolder(id: string): Promise<void>;
+  getDragCompatibilityReport(): Promise<string>;
+  copyDragCompatibilityReport(): Promise<void>;
   recycleImage(id: string): Promise<AppState>;
   restoreImage(id: string): Promise<AppState>;
   permanentlyDeleteImage(id: string): Promise<AppState>;

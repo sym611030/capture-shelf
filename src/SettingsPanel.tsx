@@ -1,13 +1,23 @@
-import { ChevronLeft, FolderPlus, FolderOpen, X, Power } from 'lucide-react';
+import { ChevronLeft, FolderPlus, FolderOpen, X, Power, Copy } from 'lucide-react';
 import type { AppState } from './types';
+import { useState } from 'react';
 interface Props { state: AppState; run: (operation: () => Promise<unknown>, success?: string) => Promise<void>; close: () => void }
 export function SettingsPanel({ state, run, close }: Props) {
+  const [dragReport, setDragReport] = useState('');
+  const [checking, setChecking] = useState(false);
   const settings = state.settings;
   const update = (patch: Parameters<typeof window.captureShelf.updateSettings>[0]) => run(() => window.captureShelf.updateSettings(patch));
   return <section className="settings-view"><div className="settings-heading"><button className="icon-button" aria-label="返回截图" onClick={close}><ChevronLeft size={19} /></button><h2>设置</h2></div>
     <div className="settings-section"><h3>自动收集</h3><label className="setting-row"><span><strong>剪贴板中的图片</strong><small>包含截图，也包含从其他应用复制的图片</small></span><input type="checkbox" checked={settings.clipboardCaptureEnabled} onChange={(event) => update({ clipboardCaptureEnabled: event.target.checked })} /></label><label className="setting-row"><span><strong>截图目录中的新图片</strong><small>只接收新文件，旧截图可通过“导入”添加</small></span><input type="checkbox" checked={settings.directoryCaptureEnabled} onChange={(event) => update({ directoryCaptureEnabled: event.target.checked })} /></label><div className="directory-list">{state.watchedDirectories.map((directory) => <div key={directory}><FolderOpen size={14} /><span title={directory}>{directory}</span>{settings.watchedDirectories.includes(directory) && <button className="small-icon" title="移除此目录" onClick={() => run(() => window.captureShelf.removeDirectory(directory))}><X size={13} /></button>}</div>)}</div><button className="text-button" onClick={() => run(() => window.captureShelf.addDirectory())}><FolderPlus size={15} />添加截图目录</button><p className="helper-text">macOS 如拒绝目录访问，可到“系统设置 → 隐私与安全性 → 文件与文件夹”允许访问，也可以手动导入。</p></div>
     <div className="settings-section"><h3>显示与容量</h3><label className="setting-row"><span><strong>窗口透明度</strong><small>{Math.round(settings.opacity * 100)}%</small></span><input aria-label="窗口透明度" type="range" min="0.65" max="1" step="0.05" value={settings.opacity} onChange={(event) => update({ opacity: Number(event.target.value) })} /></label><label className="setting-row"><span><strong>缩略图大小</strong><small>{settings.thumbnailSize}px</small></span><input aria-label="缩略图大小" type="range" min="120" max="260" step="10" value={settings.thumbnailSize} onChange={(event) => update({ thumbnailSize: Number(event.target.value) })} /></label><label className="setting-row"><span><strong>最近截图数量</strong><small>满后将最旧截图移入回收区；回收区保留 100 张或 7 天</small></span><select aria-label="最近截图数量" value={settings.activeLimit} onChange={(event) => update({ activeLimit: Number(event.target.value) })}>{[10, 20, 30, 50, 100].map((limit) => <option key={limit} value={limit}>{limit} 张</option>)}</select></label></div>
     <div className="settings-section"><h3>启动与存储</h3><label className="setting-row"><span><strong>登录时启动</strong><small>默认关闭；安装版可启用</small></span><input type="checkbox" checked={settings.launchAtLogin} onChange={(event) => update({ launchAtLogin: event.target.checked })} /></label><p className="helper-text">显示 / 隐藏：{state.platform === 'darwin' ? '⌘ ⇧ Space' : 'Ctrl + Shift + Space'}。关闭窗口后仍在托盘运行。卸载时默认保留本地截图；可先打开数据目录自行备份或删除。</p><div className="settings-actions"><button onClick={() => run(() => window.captureShelf.openDataFolder())}><FolderOpen size={15} />打开数据目录</button><button onClick={() => run(() => window.captureShelf.quit())}><Power size={15} />退出应用</button></div></div>
+    <div className="settings-section"><h3>聊天软件拖放</h3>
+      <p className="helper-text">图片能拖动，聊天框不接收时，先右键图片 → 在文件夹中显示，再从资源管理器 / Finder 拖同一张 PNG 比较。也可单击复制后在聊天框按 {state.platform === 'darwin' ? '⌘V' : 'Ctrl+V'}。</p>
+      {state.platform === 'win32' && <p className="helper-text">Windows 上请让截图板与微信、飞书都以普通方式启动。一个以管理员方式运行、另一个普通运行时，系统可能阻止拖放。</p>}
+      <div className="settings-actions"><button disabled={checking} onClick={() => { setChecking(true); void run(async () => { try { setDragReport(await window.captureShelf.getDragCompatibilityReport()); } finally { setChecking(false); } }); }}>{checking ? '正在检查…' : '检查拖放兼容性'}</button>
+        {dragReport && <button onClick={() => run(() => window.captureShelf.copyDragCompatibilityReport(), '检查结果已复制，可发给维护者')}><Copy size={15} />复制检查结果</button>}</div>
+      {dragReport && <textarea className="drag-compatibility-report" aria-label="拖放兼容性检查结果" readOnly value={dragReport} />}
+    </div>
     {state.warnings.length > 0 && <div className="warning">{state.warnings.join('\n')}</div>}
   </section>;
 }

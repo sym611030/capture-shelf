@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, net, protocol, screen, session, shell, Tray, type IpcMainInvokeEvent } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { ScreenshotRepository } from './repository';
@@ -8,6 +9,7 @@ import { CaptureService, type WatchDirectory } from './capture-service';
 import { DragService } from './drag-service';
 import { clampBounds, type Bounds } from './window-state';
 import { sanitizeHitRegions } from './hit-regions';
+import { assessPermissions, inspectWindowsPermissions, type PermissionScan } from './drag-compatibility';
 import type { AppState, SettingsPatch, View } from './contracts';
 
 app.setName('Capture Shelf');
@@ -28,6 +30,8 @@ let interactiveRegions: Array<{ x: number; y: number; width: number; height: num
 let shapedWindow = false;
 let shapeSignature = '';
 let compactBounds: Bounds | undefined;
+let lastDrag = '尚未拖出图片';
+let compatibilityReport = '';
 const warnings = new Set<string>();
 const assetPath = (name: string) => path.join(__dirname, '../assets', name);
 const devUrl = !app.isPackaged ? process.env.VITE_DEV_SERVER_URL : undefined;
@@ -114,6 +118,35 @@ function updateWindowShape() {
   shapeSignature = signature;
   shapedWindow = true;
 }
+async function dragCompatibilityReport() {
+  const lines = [
+    'Capture Shelf 拖放兼容性检查',
+    `版本：${app.getVersion()}；安装包：${app.isPackaged ? '是' : '否'}`,
+    `系统：${process.platform} ${os.release()} ${process.arch}`,
+    `最近拖出：${lastDrag}`,
+  ];
+  if (process.platform === 'win32' && !testMode) {
+    try {
+      const scan: PermissionScan = await inspectWindowsPermissions(assetPath('windows-drag-permissions.ps1'));
+      const labels = { 'Capture Shelf': '截图板', WeChat: '微信', Feishu: '飞书' };
+      for (const entry of [scan.self, ...scan.targets]) if (entry) {
+        const level = entry.integrity;
+        const label = level == null ? '无法读取' : level >= 16384 ? '系统' : level >= 12288 ? '管理员' : level >= 8192 ? '普通' : '低权限';
+        lines.push(`${labels[entry.app]}：${label}（${level ?? '未知'}）${entry.version ? `，版本 ${entry.version}` : ''}`);
+      }
+      const result = assessPermissions(scan);
+      lines.push(result.status === 'mismatch' ? '发现权限级别不一致：可能被 Windows 阻止跨应用拖放。请保存工作后退出截图板和聊天软件，从开始菜单以普通方式重新打开，并检查快捷方式的“以管理员身份运行”选项。'
+        : result.status === 'same' ? '未发现权限级别不一致；这不代表聊天框已接受文件。'
+        : result.status === 'not-running' ? '未检测到运行中的微信或飞书，请先打开目标聊天软件后重新检查。'
+        : '部分进程权限无法读取，不能判断权限是否一致。');
+    } catch { lines.push('Windows 权限检查不可用（可能被系统策略限制），未据此判断拖放是否正常。'); }
+  } else lines.push(testMode ? '隔离测试：未检查真实聊天进程。' : 'macOS 使用系统文件拖放；此检查不代表微信、飞书实机验收。');
+  lines.push('对照：右键图片 → 在文件夹中显示，从资源管理器 / Finder 拖同一张 PNG 到聊天输入区。',
+    '替代：单击图片复制，再在聊天输入区按 Ctrl/Cmd+V；是否接收仍由目标软件决定。',
+    '本报告不包含截图、文件路径、账号、聊天内容，也不会自动上传。');
+  compatibilityReport = lines.join('\n');
+  return compatibilityReport;
+}
 function registerIpc() {
   const handle = (channel: string, action: (...args: any[]) => unknown) => ipcMain.handle(channel, async (event, ...args) => {
     validateSender(event);
@@ -180,6 +213,15 @@ function registerIpc() {
     const target = repository.getPath(id);
     if (!testMode) { const error = await shell.openPath(target); if (error) throw new Error(error); }
   });
+  handle('show-image-in-folder', (id: string) => {
+    const file = drag.prepareDragFile(id);
+    if (!testMode) shell.showItemInFolder(file);
+  });
+  handle('drag-compatibility-report', dragCompatibilityReport);
+  handle('copy-drag-compatibility-report', async () => {
+    const text = compatibilityReport || await dragCompatibilityReport();
+    if (!testMode) await clipboard.write([new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+  });
   for (const [channel, action] of [
     ['recycle-image', (id: string) => repository.recycle(id)],
     ['restore-image', (id: string) => repository.restore(id)],
@@ -211,12 +253,16 @@ function registerIpc() {
   });
   // Send instead of async invoke keeps the native drag attached to Chromium's dragstart gesture.
   ipcMain.on('start-drag', (event, id: string) => {
+    let stage = '文件准备';
     try {
       validateSender(event as unknown as IpcMainInvokeEvent);
       const file = drag.prepareDragFile(id);
       const icon = nativeImage.createFromPath(file).resize({ width: 96 });
+      if (icon.isEmpty()) throw new Error('拖放图片不可读');
+      stage = '系统拖放调用';
       event.sender.startDrag({ file, icon });
-    } catch (error) { notice(`拖放失败：${(error as Error).message}`); }
+      lastDrag = `${new Date().toISOString()} PNG 已交给系统；目标软件是否接收无法由此确认`;
+    } catch (error) { lastDrag = `${new Date().toISOString()} ${stage}失败`; notice(`拖放失败：${(error as Error).message}`); }
   });
 }
 function createWindow() {

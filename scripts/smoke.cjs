@@ -122,6 +122,12 @@ async function drawSamples(page) {
   await page.evaluate(id => window.captureShelf.permanentlyDeleteImage(id), id);
   assert.ok(fs.existsSync(dragPath));
   checks.push('materialized drag file survives removal of shelf original');
+  await page.locator('.rope-card-surface').first().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: '在文件夹中显示' }).click();
+  const remainingId = (await state()).active[0].id;
+  const revealedPath = await app.evaluate(({ app }, id) => app.captureShelfTest.dragFile(id), remainingId);
+  assert.ok(fs.existsSync(revealedPath));
+  checks.push('show-in-folder fallback prepares a retained PNG without opening Explorer in tests');
   await panelAction(page, '切换置顶');
   assert.equal((await state()).settings.alwaysOnTop, false);
   await panelAction(page, '暂停全部捕获');
@@ -130,6 +136,14 @@ async function drawSamples(page) {
   await page.waitForTimeout(650); assert.equal((await state()).active.length, 29);
   checks.push('pin toggle and pause stop directory capture');
   await panelAction(page, '设置');
+  await page.getByRole('button', { name: '检查拖放兼容性', exact: true }).click();
+  const reportField = page.getByRole('textbox', { name: '拖放兼容性检查结果' });
+  await reportField.waitFor();
+  const compatibilityReport = await reportField.inputValue();
+  assert.ok(compatibilityReport.includes('隔离测试：未检查真实聊天进程。'));
+  assert.ok(!compatibilityReport.includes(dataDir));
+  await page.getByRole('button', { name: '复制检查结果' }).click();
+  checks.push('compatibility report keeps real chat processes and clipboard isolated and omits data paths');
   await page.screenshot({ path: path.join(evidence, 'settings.png') });
   await page.getByRole('button', { name: '返回截图' }).click();
   await panelAction(page, '继续捕获');

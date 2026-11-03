@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Camera, Pin, PinOff, Settings2, X, Copy, Trash2, RotateCcw, ImagePlus, Pause, Play, Check, ExternalLink, MoreHorizontal, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Camera, Pin, PinOff, Settings2, X, Copy, Trash2, RotateCcw, ImagePlus, Pause, Play, Check, ExternalLink, FolderOpen, MoreHorizontal, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AppState, ScreenshotItem, View } from './types';
 import { SettingsPanel } from './SettingsPanel';
 import { Onboarding } from './Onboarding';
@@ -98,7 +98,7 @@ export default function App() {
   const menuAction = (action: () => void) => { setPanelMenuOpen(false); action(); };
   const contextMenu = (event: React.MouseEvent, item: ScreenshotItem) => {
     event.preventDefault(); event.stopPropagation(); setSelectedId(item.id); setPanelMenuOpen(false);
-    setMenu({ id: item.id, x: Math.max(8, Math.min(event.clientX, innerWidth - 195)), y: Math.max(7, Math.min(event.clientY, innerHeight - 190)) });
+    setMenu({ id: item.id, x: Math.max(8, Math.min(event.clientX, innerWidth - 210)), y: Math.max(7, Math.min(event.clientY, innerHeight - 210)) });
   };
   const hint = state.preview ? '示例预览 · 不自动收集' : view === 'recycled' ? '回收区 · 单击复制，右键恢复 · 保留 7 天' : `${state.captureStatus === 'paused' ? '自动收集已暂停' : '截图自动挂好'} · 单击复制，拖出发送`;
   return <main className={`app-shell rope-app-shell ${settingsOpen ? 'show-settings' : ''}`} style={{ '--thumb-size': `${state.settings.thumbnailSize}px` } as CSSProperties} onClick={() => { setMenu(null); setPanelMenuOpen(false); }}>
@@ -144,6 +144,7 @@ export default function App() {
     {menu && menuItem && <div className="context-menu" style={{ left: menu.x, top: menu.y }} role="menu" onClick={(event) => event.stopPropagation()}>
       <button role="menuitem" onClick={() => { setMenu(null); void copy(menuItem.id); }}><Copy size={15} />复制图片</button>
       <button role="menuitem" onClick={() => { setMenu(null); void run(() => window.captureShelf.openImage(menuItem.id)); }}><ExternalLink size={15} />查看原图</button>
+      <button role="menuitem" onClick={() => { setMenu(null); void run(() => window.captureShelf.showImageInFolder(menuItem.id)); }}><FolderOpen size={15} />在文件夹中显示</button>
       {view === 'active' ? <button role="menuitem" onClick={() => { setMenu(null); void recycle(menuItem.id); }}><Trash2 size={15} />取下并回收</button> : <><button role="menuitem" onClick={() => { setMenu(null); void restore(menuItem.id); }}><RotateCcw size={15} />恢复到绳子</button><button role="menuitem" className="danger-action" onClick={() => { setMenu(null); setConfirmation('single'); }}><Trash2 size={15} />永久删除</button></>}
     </div>}
     {message && <div className="toast" role="status"><Check size={14} />{message}</div>}
