@@ -8,6 +8,14 @@
 
 在 [Releases](https://github.com/sym611030/capture-shelf/releases/latest) 下载对应系统的文件；安装版和便携版都自带运行时，不需要 Node.js。
 
+想让自己的 Agent 代为安装或更新，可直接把 [给 Agent 的安装与更新指令](AGENT_INSTALL_PROMPT.md) 发给它；该文件始终指向最新正式版，每次发布也会作为 Release 附件提供。
+
+也可以直接复制这句话给 Agent：
+
+```text
+请读取 https://raw.githubusercontent.com/sym611030/capture-shelf/main/AGENT_INSTALL_PROMPT.md ，按照其中的指令帮我安装或更新截图晾衣绳。
+```
+
 - **Windows 10 22H2 / Windows 11，64 位**：下载 `Capture-Shelf-版本-windows-x64-setup.exe`，双击安装，可选择目录；安装后从“截图晾衣绳”快捷方式打开。`portable.exe` 是免安装版。
 - **macOS 13+，Apple Silicon**：下载 `macos-arm64.dmg`，打开后把应用拖入 Applications。
 - **macOS 13+，Intel**：下载 `macos-x64.dmg`，安装方式相同。
